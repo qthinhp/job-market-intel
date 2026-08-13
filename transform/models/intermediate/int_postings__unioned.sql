@@ -53,8 +53,15 @@ select
                                                                                 then 'staff+'
         when regexp_matches(lower(title), '\b(senior|sr\.?|lead)\b')            then 'senior'
         when regexp_matches(lower(title), '\b(junior|jr\.?|associate|entry)\b') then 'entry'
-        when regexp_matches(lower(title), '\b(ii|iii|2|3)\b')                   then 'mid'
-        when regexp_matches(lower(title), '\b(i|1)\b')                          then 'entry'
+
+        -- Level numerals, but never on a management title. "Manager I" is a
+        -- first-line manager, not an entry-level hire, and the bare "I" would
+        -- otherwise match and bury it in the entry band.
+        when not regexp_matches(lower(title), '\b(manager|director|vp|head|chief|principal)\b')
+             and regexp_matches(lower(title), '\b(ii|iii|2|3)\b')               then 'mid'
+        when not regexp_matches(lower(title), '\b(manager|director|vp|head|chief|principal)\b')
+             and regexp_matches(lower(title), '\b(i|1)\b')                      then 'entry'
+
         else 'unspecified'
     end as seniority_band,
 
