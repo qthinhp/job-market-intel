@@ -62,26 +62,42 @@ FROM read_json(?, columns = {ENVELOPE_COLUMNS}) AS envelope,
 """
 
 
-def existing_payload_keys(con: duckdb.DuckDBPyConnection) -> None:
-    """Register the payloads already in the store as a temp view."""
-    if any(PAYLOAD_DIR.glob("*.parquet")):
+def existing_payload_keys(con: duckdb.DuckDBPyConnection, snapshot_date: str) -> None:
+    """Materialize the payloads already in the store as a temp table.
+
+    Three things here are load-bearing, each of which broke a real run:
+
+    1. The date being persisted is excluded from its own "already known" set.
+       Re-running a date rewrites its payload file, so treating that file as
+       prior knowledge would find zero new payloads and erase it.
+
+    2. A TEMP TABLE, not a view. A view stays lazy, so the parquet files would
+       still be open for reading when COPY starts overwriting one of them.
+       Materializing forces the read to finish first.
+
+    3. The file list goes through the relation API rather than a bound
+       parameter — DuckDB rejects prepared parameters inside CREATE statements.
+    """
+    others = sorted(p for p in PAYLOAD_DIR.glob("*.parquet") if p.stem != snapshot_date)
+
+    if not others:
         con.execute(
-            "CREATE OR REPLACE TEMP VIEW known AS "
-            "SELECT DISTINCT posting_key, payload_hash FROM read_parquet(?)",
-            [str(PAYLOAD_DIR / "*.parquet")],
+            "CREATE OR REPLACE TEMP TABLE known "
+            "(posting_key VARCHAR, payload_hash VARCHAR)"
         )
-    else:
-        # First run: nothing is known yet, but downstream SQL still needs the view.
-        con.execute(
-            "CREATE OR REPLACE TEMP VIEW known AS "
-            "SELECT NULL::VARCHAR AS posting_key, NULL::VARCHAR AS payload_hash WHERE false"
-        )
+        return
+
+    con.read_parquet([p.as_posix() for p in others]).create_view("known_src", replace=True)
+    con.execute(
+        "CREATE OR REPLACE TEMP TABLE known AS "
+        "SELECT DISTINCT posting_key, payload_hash FROM known_src"
+    )
 
 
 def persist_date(con: duckdb.DuckDBPyConnection, snapshot_date: str) -> tuple[int, int]:
     raw_glob = str(RAW_DIR / snapshot_date / "*.json")
     con.execute(EXTRACT, [raw_glob])
-    existing_payload_keys(con)
+    existing_payload_keys(con, snapshot_date)
 
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
     PAYLOAD_DIR.mkdir(parents=True, exist_ok=True)
