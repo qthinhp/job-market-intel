@@ -17,12 +17,17 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: write   # commit the day's store
+  pages: write      # publish the site
+  id-token: write   # required by deploy-pages
 
 jobs:
   ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -70,3 +75,18 @@ jobs:
           name: warehouse-${{ github.run_number }}
           path: data/warehouse.duckdb
           retention-days: 14
+
+      # Site build runs after the store commit, so a failure here still leaves
+      # the day's data safely captured.
+      - name: Build site
+        run: uv run python site/build.py
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+      - name: Deploy to Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

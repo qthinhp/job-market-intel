@@ -37,3 +37,8 @@ jobs:
       - name: Build and test models
         working-directory: transform
         run: uv run dbt build --profiles-dir .
+
+      # Catches a broken site build on the PR rather than at 06:20 the next
+      # morning. Builds only — deployment happens from the daily job.
+      - name: Build site
+        run: uv run python site/build.py

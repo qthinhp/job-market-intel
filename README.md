@@ -71,12 +71,26 @@ cd transform; uv run dbt build --profiles-dir .
 To rebuild from a fresh clone without hitting any API, skip the first two
 steps — the store is already in the repo.
 
+## The site
+
+```powershell
+uv run python site/build.py     # -> site/dist/index.html
+```
+
+One self-contained HTML file — data, styles, and script inlined, no CDN and no
+server. All open postings ship with the page and are filtered client-side, so
+search is instant. Sort any column, filter by family or level, or narrow to
+data roles / remote / pay-disclosed in one click.
+
+Published daily to GitHub Pages by the ingest workflow, so it is never more
+than a day stale.
+
 ## Automation
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ingest.yml` | 06:20 UTC daily | Fetch, persist, rebuild, test, commit the store |
-| `ci.yml` | PR and push to main | Lint, rebuild from store, run all dbt tests |
+| `ingest.yml` | 06:20 UTC daily | Fetch, persist, rebuild, test, commit store, deploy site |
+| `ci.yml` | PR and push to main | Lint, rebuild from store, run all dbt tests, build site |
 
 The daily job tests the new snapshot *before* committing it, so a bad day never
 lands on main.
