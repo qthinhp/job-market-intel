@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Landing zone written by the Python ingest. Never edited by dbt.
+    schema: raw
+    tables:
+      - name: postings
+        description: >
+          One row per job posting per daily snapshot. `payload` holds the
+          untouched API response for that posting.
+        columns:
+          - name: posting_id
+            description: Natural key from the source ATS. Unique within a company.
+            tests:
+              - not_null
+          - name: snapshot_date
+            tests:
+              - not_null
+          - name: payload
+            tests:
+              - not_null

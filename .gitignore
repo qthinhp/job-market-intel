@@ -1,0 +1,24 @@
+# Environment
+.env
+.venv/
+__pycache__/
+*.py[cod]
+
+# Data — never commit the warehouse or raw snapshots
+data/raw/
+data/*.duckdb
+data/*.duckdb.wal
+
+# dbt
+transform/target/
+transform/dbt_packages/
+transform/logs/
+
+# Power BI
+*.pbix.bak
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

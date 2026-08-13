@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: dim_company
+    description: One row per tracked company with its hiring profile as of the latest snapshot.
+    columns:
+      - name: company_token
+        description: Primary key. The company's identifier in its ATS.
+        tests:
+          - unique
+          - not_null
+      - name: postings_per_requisition
+        description: >
+          Postings divided by distinct roles. Above ~1.5 means the company
+          fans one role out across many cities; raw posting counts are not
+          comparable across companies without accounting for it.
+
+  - name: dim_posting
+    description: >
+      One row per posting ever observed, with latest attributes and lifecycle
+      across snapshots.
+    columns:
+      - name: posting_key
+        description: Primary key. company_token + source posting id.
+        tests:
+          - unique
+          - not_null
+      - name: company_token
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_company')
+              field: company_token
+      - name: title
+        tests:
+          - not_null
+      - name: job_family
+        tests:
+          - accepted_values:
+              values: [analytics, 'analytics engineering', 'data engineering', 'data science',
+                       'ml engineering', research, 'software engineering', infrastructure,
+                       security, 'solutions engineering', 'customer success', product,
+                       design, sales, marketing, people, finance, legal, operations, other]
+      - name: seniority_band
+        tests:
+          - accepted_values:
+              values: [intern, entry, mid, senior, 'staff+', executive, unspecified]
+      - name: is_open
+        tests:
+          - not_null
+      - name: first_seen_date
+        tests:
+          - not_null
+
+  - name: fct_posting_snapshot
+    description: >
+      Grain is one row per posting per day observed open. That grain is
+      asserted by tests/assert_posting_grain_is_unique.sql.
+    columns:
+      - name: posting_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_posting')
+              field: posting_key
+      - name: snapshot_date
+        tests:
+          - not_null
+      - name: requisition_weight
+        description: Fractional weight so a role posted in N cities still counts as one role.
+        tests:
+          - not_null

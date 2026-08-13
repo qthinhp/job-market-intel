@@ -1,0 +1,35 @@
+# Seed list of US tech companies whose applicant tracking systems expose a
+# public, documented job board API. Every token below was verified live before
+# being added — see scripts/probe_boards.py to re-verify or extend the list.
+#
+# ats:   greenhouse | ashby
+# token: the board identifier used in the ATS URL
+
+companies:
+  # --- Greenhouse ---
+  - { name: Stripe,      token: stripe,      ats: greenhouse, segment: fintech }
+  - { name: Databricks,  token: databricks,  ats: greenhouse, segment: data }
+  - { name: Datadog,     token: datadog,     ats: greenhouse, segment: infra }
+  - { name: Anthropic,   token: anthropic,   ats: greenhouse, segment: ai }
+  - { name: Cloudflare,  token: cloudflare,  ats: greenhouse, segment: infra }
+  - { name: Brex,        token: brex,        ats: greenhouse, segment: fintech }
+  - { name: GitLab,      token: gitlab,      ats: greenhouse, segment: devtools }
+  - { name: Coinbase,    token: coinbase,    ats: greenhouse, segment: fintech }
+  - { name: Twilio,      token: twilio,      ats: greenhouse, segment: infra }
+  - { name: Figma,       token: figma,       ats: greenhouse, segment: saas }
+  - { name: Reddit,      token: reddit,      ats: greenhouse, segment: consumer }
+  - { name: Asana,       token: asana,       ats: greenhouse, segment: saas }
+  - { name: Robinhood,   token: robinhood,   ats: greenhouse, segment: fintech }
+  - { name: Instacart,   token: instacart,   ats: greenhouse, segment: consumer }
+  - { name: Vercel,      token: vercel,      ats: greenhouse, segment: devtools }
+  - { name: Discord,     token: discord,     ats: greenhouse, segment: consumer }
+  - { name: Airtable,    token: airtable,    ats: greenhouse, segment: saas }
+
+  # --- Ashby ---
+  - { name: OpenAI,      token: openai,      ats: ashby, segment: ai }
+  - { name: Snowflake,   token: snowflake,   ats: ashby, segment: data }
+  - { name: Ramp,        token: ramp,        ats: ashby, segment: fintech }
+  - { name: Notion,      token: notion,      ats: ashby, segment: saas }
+  - { name: Benchling,   token: benchling,   ats: ashby, segment: biotech }
+  - { name: Ashby,       token: ashby,       ats: ashby, segment: saas }
+  - { name: Linear,      token: linear,      ats: ashby, segment: devtools }

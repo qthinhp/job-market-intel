@@ -1,0 +1,13 @@
+# Kept in the repo (rather than ~/.dbt) so the project is self-contained and CI
+# needs no setup. Safe to commit only because DuckDB is a local file with no
+# credentials — never do this with a Snowflake or BigQuery profile.
+#
+# Run dbt from transform/ with:  dbt build --profiles-dir .
+
+job_market_intel:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/warehouse.duckdb
+      threads: 4
