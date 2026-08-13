@@ -1,40 +1,29 @@
-"""Load raw JSON snapshots into the DuckDB `raw` schema.
+"""Rebuild the DuckDB warehouse from the committed parquet store.
 
-One row per posting per snapshot. The full API response for each posting is
-kept intact in a JSON column — Greenhouse and Ashby disagree about almost every
-field name, and reconciling them is dbt's job, not the loader's. The only thing
-pulled out here is the posting id, because reloads need a natural key.
+Reads `store/`, not `data/raw/`. That distinction is the whole point: the store
+is in git, so a clean CI runner — which has no raw JSON and never ran the
+ingest — can reconstruct the warehouse exactly. Raw JSON stays local as a
+debugging artifact.
 
-Loads are idempotent per snapshot date: a date is deleted and rewritten, so
-re-running after a partial failure is always safe.
+The rebuild is total rather than incremental. At this size it costs under a
+second, and it removes an entire class of bug where a partially applied load
+leaves the warehouse in a state no one can reproduce.
 """
 
 from __future__ import annotations
 
-import argparse
 import sys
 
 import duckdb
 
-from ingest.config import RAW_DIR, WAREHOUSE
-
-# Declaring the schema explicitly (rather than letting DuckDB sniff it) keeps
-# `jobs` as an opaque JSON array. Auto-detection would try to unify Greenhouse
-# and Ashby posting shapes into one struct and drop whatever didn't fit.
-ENVELOPE_COLUMNS = """{
-    company_name:  'VARCHAR',
-    company_token: 'VARCHAR',
-    ats:           'VARCHAR',
-    segment:       'VARCHAR',
-    snapshot_date: 'DATE',
-    fetched_at:    'TIMESTAMPTZ',
-    jobs:          'JSON[]'
-}"""
+from ingest.config import WAREHOUSE
+from ingest.persist import PAYLOAD_DIR, SNAPSHOT_DIR
 
 DDL = """
 CREATE SCHEMA IF NOT EXISTS raw;
+DROP TABLE IF EXISTS raw.postings;
 
-CREATE TABLE IF NOT EXISTS raw.postings (
+CREATE TABLE raw.postings (
     snapshot_date DATE        NOT NULL,
     fetched_at    TIMESTAMPTZ NOT NULL,
     ats           VARCHAR     NOT NULL,
@@ -46,70 +35,68 @@ CREATE TABLE IF NOT EXISTS raw.postings (
 );
 """
 
-INSERT = f"""
+# Snapshots carry the payload_hash that was live on that date, so a posting
+# edited mid-flight resolves to the text it actually had at the time.
+INSERT = """
 INSERT INTO raw.postings
 SELECT
-    envelope.snapshot_date,
-    envelope.fetched_at,
-    envelope.ats,
-    envelope.company_name,
-    envelope.company_token,
-    envelope.segment,
-    json_extract_string(job, '$.id') AS posting_id,
-    job                              AS payload
-FROM read_json(?, columns = {ENVELOPE_COLUMNS}) AS envelope,
-     UNNEST(envelope.jobs) AS unnested(job)
+    snapshots.snapshot_date,
+    snapshots.fetched_at,
+    snapshots.ats,
+    snapshots.company_name,
+    snapshots.company_token,
+    snapshots.segment,
+    snapshots.posting_id,
+    payloads.payload
+FROM read_parquet(?) AS snapshots
+JOIN read_parquet(?) AS payloads
+    ON  snapshots.posting_key  = payloads.posting_key
+    AND snapshots.payload_hash = payloads.payload_hash
 """
 
 
-def snapshot_dates() -> list[str]:
-    if not RAW_DIR.exists():
-        return []
-    return sorted(p.name for p in RAW_DIR.iterdir() if p.is_dir())
-
-
-def load_date(con: duckdb.DuckDBPyConnection, snapshot_date: str) -> int:
-    pattern = str(RAW_DIR / snapshot_date / "*.json")
-
-    con.execute("DELETE FROM raw.postings WHERE snapshot_date = ?", [snapshot_date])
-    con.execute(INSERT, [pattern])
-
-    (count,) = con.execute(
-        "SELECT count(*) FROM raw.postings WHERE snapshot_date = ?", [snapshot_date]
-    ).fetchone()
-    return count
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--date", help="load only this snapshot date (default: all)")
-    args = parser.parse_args()
+    snapshot_glob = str(SNAPSHOT_DIR / "*.parquet")
+    payload_glob = str(PAYLOAD_DIR / "*.parquet")
 
-    dates = [args.date] if args.date else snapshot_dates()
-    if not dates:
-        print("No snapshots found — run `python -m ingest.run` first.", file=sys.stderr)
+    if not any(SNAPSHOT_DIR.glob("*.parquet")):
+        print("Store is empty — run `python -m ingest.persist` first.", file=sys.stderr)
         return 1
 
     WAREHOUSE.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(WAREHOUSE))
     con.execute(DDL)
+    con.execute(INSERT, [snapshot_glob, payload_glob])
 
-    for snapshot_date in dates:
-        count = load_date(con, snapshot_date)
-        print(f"  {snapshot_date}  {count:>6,} postings")
+    # The join above is inner: a snapshot row whose payload is missing from the
+    # store would vanish silently and undercount that day. Catch it here rather
+    # than discovering a dip in the dashboard three weeks later.
+    (expected,) = con.execute(
+        "SELECT count(*) FROM read_parquet(?)", [snapshot_glob]
+    ).fetchone()
+    (loaded,) = con.execute("SELECT count(*) FROM raw.postings").fetchone()
+
+    if loaded != expected:
+        print(
+            f"ERROR: {expected - loaded} snapshot rows had no matching payload "
+            f"(expected {expected:,}, loaded {loaded:,}). The store is inconsistent.",
+            file=sys.stderr,
+        )
+        return 1
 
     summary = con.execute("""
-        SELECT count(*)                    AS rows,
-               count(DISTINCT posting_id)  AS postings,
-               count(DISTINCT company_token) AS companies,
-               count(DISTINCT snapshot_date) AS snapshots
+        SELECT count(*),
+               count(DISTINCT company_token),
+               count(DISTINCT snapshot_date),
+               min(snapshot_date),
+               max(snapshot_date)
         FROM raw.postings
     """).fetchone()
     con.close()
 
     print(
-        f"\nraw.postings: {summary[0]:,} rows | {summary[1]:,} distinct postings "
-        f"| {summary[2]} companies | {summary[3]} snapshot(s)"
+        f"raw.postings: {summary[0]:,} rows | {summary[1]} companies | "
+        f"{summary[2]} snapshot(s) | {summary[3]} .. {summary[4]}"
     )
     print(f"Warehouse: {WAREHOUSE}")
     return 0

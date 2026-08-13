@@ -1,0 +1,9 @@
+# Normalize line endings so the repo is identical on Windows and on the Linux
+# CI runners. Without this, every file committed from Windows shows up as
+# modified in Actions.
+* text=auto eol=lf
+
+# Parquet is binary — never let git touch the bytes.
+*.parquet binary
+*.duckdb  binary
+*.pbix    binary

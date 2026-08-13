@@ -1,0 +1,72 @@
+name: Daily ingest
+
+# 06:20 UTC daily. GitHub queues scheduled jobs on a best-effort basis and
+# runs on the hour are the most contended, so an offset minute gets picked up
+# noticeably sooner.
+#
+# Note: GitHub disables scheduled workflows on public repos after 60 days with
+# no commits. This job commits on most days, which keeps itself alive.
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+# Never let two ingests race to commit the store.
+concurrency:
+  group: daily-ingest
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Fetch today's snapshot
+        run: uv run python -m ingest.run
+
+      - name: Persist to parquet store
+        run: uv run python -m ingest.persist
+
+      # Rebuilding and testing before committing means a snapshot that would
+      # break the models never reaches main.
+      - name: Rebuild warehouse
+        run: uv run python -m ingest.load
+
+      - name: Transform and test
+        working-directory: transform
+        run: uv run dbt build --profiles-dir .
+
+      - name: Commit store
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add store/
+          if git diff --staged --quiet; then
+            echo "No store changes — nothing to commit."
+          else
+            git commit -m "Snapshot $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      # The warehouse is gitignored, so publish it as an artifact for anyone
+      # who wants to query the day's data without rebuilding it themselves.
+      - name: Upload warehouse
+        uses: actions/upload-artifact@v4
+        with:
+          name: warehouse-${{ github.run_number }}
+          path: data/warehouse.duckdb
+          retention-days: 14

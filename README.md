@@ -28,9 +28,26 @@ Currently tracking **24 companies / ~5,600 open postings**. See
 ## Architecture
 
 ```
-ATS APIs  ->  raw JSON snapshots  ->  DuckDB  ->  dbt  ->  star schema  ->  Power BI
-(httpx)       data/raw/{date}/       raw.*      tests     marts.*
+ATS APIs ->  raw JSON      ->  parquet store  ->  DuckDB  ->  dbt  ->  Power BI
+(httpx)      data/raw/         store/             raw.*      marts.*
+             local only        committed
 ```
+
+The parquet store is the part worth explaining. CI runners are ephemeral, so
+whatever the pipeline must remember between runs has to live in git — but the
+raw JSON is ~66 MB per day, which would bloat the repo past a gigabyte in a
+month.
+
+Nearly all of that weight is job descriptions, and descriptions rarely change.
+So the store splits into a thin daily snapshot (which postings were open) and
+an append-only payload table keyed by content hash (what each posting said).
+A payload is written once; an edited posting adds a second version rather than
+overwriting the first, and the snapshot records which version was live on which
+day. That means the warehouse for any past date can be rebuilt exactly.
+
+**66 MB/day becomes ~0.3 MB/day**, and `ingest.load` can rebuild the entire
+warehouse from git alone — which is exactly what CI does on every pull request,
+with no network access and no API calls.
 
 | Layer | Tool |
 |---|---|
@@ -44,20 +61,36 @@ ATS APIs  ->  raw JSON snapshots  ->  DuckDB  ->  dbt  ->  star schema  ->  Powe
 ## Quickstart
 
 ```powershell
-uv sync                          # create venv, install everything
-uv run python -m ingest.run      # pull today's snapshot to data/raw/
-uv run python -m ingest.load     # load snapshots into DuckDB
-cd transform; uv run dbt build   # transform + test
+uv sync                            # create venv, install everything
+uv run python -m ingest.run        # fetch every board -> data/raw/
+uv run python -m ingest.persist    # raw JSON -> store/ parquet
+uv run python -m ingest.load       # store/ -> DuckDB
+cd transform; uv run dbt build --profiles-dir .
 ```
+
+To rebuild from a fresh clone without hitting any API, skip the first two
+steps — the store is already in the repo.
+
+## Automation
+
+| Workflow | Trigger | Does |
+|---|---|---|
+| `ingest.yml` | 06:20 UTC daily | Fetch, persist, rebuild, test, commit the store |
+| `ci.yml` | PR and push to main | Lint, rebuild from store, run all dbt tests |
+
+The daily job tests the new snapshot *before* committing it, so a bad day never
+lands on main.
 
 ## Repo layout
 
 ```
-ingest/          Python ingest: one module per ATS source
+ingest/          one module per ATS source
   sources/       greenhouse.py, ashby.py
-  run.py         fetch all boards -> data/raw/
-  load.py        data/raw/ -> DuckDB raw schema
-transform/       dbt project (staging -> marts)
-scripts/         one-off utilities, e.g. board probing
-data/            raw snapshots + warehouse.duckdb (both gitignored)
+  run.py         fetch all boards      -> data/raw/
+  persist.py     raw JSON              -> store/ parquet
+  load.py        store/                -> DuckDB raw schema
+transform/       dbt project (staging -> intermediate -> marts)
+store/           committed parquet: the pipeline's memory
+scripts/         utilities, e.g. probing new ATS boards
+data/            raw JSON + warehouse.duckdb (both gitignored)
 ```
