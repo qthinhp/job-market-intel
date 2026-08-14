@@ -26,20 +26,42 @@ WAREHOUSE = REPO_ROOT / "data" / "warehouse.duckdb"
 DIST = Path(__file__).resolve().parent / "dist"
 
 POSTINGS_SQL = """
+with posting_skills as (
+    select posting_key, list(skill order by skill) as skills
+    from marts.fct_posting_skill
+    group by posting_key
+)
 select
-    company_name              as company,
-    title,
-    job_family                as family,
-    seniority_band            as seniority,
-    coalesce(location_raw, '')as location,
-    is_remote                 as remote,
-    coalesce(compensation_summary, '') as pay,
-    job_url                   as url,
-    cast(published_at as date)as published,
-    days_since_published      as age
-from marts.dim_posting
-where is_open
-order by company_name, title
+    p.company_name              as company,
+    p.title,
+    p.job_family                as family,
+    p.seniority_band            as seniority,
+    coalesce(p.location_raw, '')as location,
+    p.is_remote                 as remote,
+    coalesce(p.compensation_summary, '') as pay,
+    p.job_url                   as url,
+    cast(p.published_at as date)as published,
+    p.days_since_published      as age,
+    coalesce(s.skills, []::varchar[]) as skills
+from marts.dim_posting as p
+left join posting_skills as s using (posting_key)
+where p.is_open
+order by p.company_name, p.title
+"""
+
+SKILLS_SQL = """
+select skill, count(*) as postings
+from marts.fct_posting_skill
+group by skill
+order by postings desc
+limit 16
+"""
+
+SKILL_OPTIONS_SQL = """
+select skill, count(*) as postings
+from marts.fct_posting_skill
+group by skill
+order by skill
 """
 
 SUMMARY_SQL = """
@@ -103,6 +125,8 @@ def build() -> int:
     summary = rows(con, SUMMARY_SQL)[0]
     families = rows(con, FAMILY_SQL)
     companies = rows(con, COMPANY_SQL)
+    top_skills = rows(con, SKILLS_SQL)
+    all_skills = rows(con, SKILL_OPTIONS_SQL)
     con.close()
 
     html = TEMPLATE.format(
@@ -120,6 +144,11 @@ def build() -> int:
         ),
         family_bars=render_bars(families, "family", "postings"),
         company_bars=render_bars(companies[:12], "company", "postings"),
+        skill_bars=render_bars(top_skills, "skill", "postings"),
+        skill_options="".join(
+            f'<option value="{s["skill"]}">{s["skill"]} ({s["postings"]})</option>'
+            for s in all_skills
+        ),
         data_families=to_json(DATA_FAMILIES),
         postings_json=to_json(postings),
     )
@@ -220,6 +249,7 @@ TEMPLATE = """<!doctype html>
   td.title {{ white-space:normal; min-width:280px; }}
   .tag {{ background:var(--accent-soft); color:var(--accent); border-radius:5px;
          padding:2px 7px; font-size:11.5px; white-space:nowrap; }}
+  .skills {{ color:var(--muted); font-size:11.5px; margin-top:3px; white-space:normal; }}
   .empty {{ padding:34px; text-align:center; color:var(--muted); }}
   footer {{ margin-top:26px; color:var(--muted); font-size:12.5px; }}
 </style>
@@ -247,10 +277,16 @@ TEMPLATE = """<!doctype html>
     <div class="panel"><h2>Top companies by openings</h2>{company_bars}</div>
   </div>
 
+  <div class="panel" style="margin-bottom:26px">
+    <h2>Most-requested skills &amp; tools</h2>
+    {skill_bars}
+  </div>
+
   <div class="controls">
     <input type="search" id="q" placeholder="Search title, company, or location…" autocomplete="off">
     <select id="family"><option value="">All families</option>{family_options}</select>
     <select id="seniority"><option value="">All levels</option></select>
+    <select id="skill"><option value="">Any skill</option>{skill_options}</select>
     <button class="chip" id="dataOnly" aria-pressed="false">Data roles only</button>
     <button class="chip" id="remoteOnly" aria-pressed="false">Remote</button>
     <button class="chip" id="payOnly" aria-pressed="false">Pay shown</button>
@@ -301,7 +337,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
 
 function filtered() {{
   const q = $('q').value.trim().toLowerCase();
-  const fam = $('family').value, sen = $('seniority').value;
+  const fam = $('family').value, sen = $('seniority').value, sk = $('skill').value;
   const dataOnly   = $('dataOnly').getAttribute('aria-pressed') === 'true';
   const remoteOnly = $('remoteOnly').getAttribute('aria-pressed') === 'true';
   const payOnly    = $('payOnly').getAttribute('aria-pressed') === 'true';
@@ -309,6 +345,7 @@ function filtered() {{
   let out = ALL.filter(p =>
     (!fam || p.family === fam) &&
     (!sen || p.seniority === sen) &&
+    (!sk  || (p.skills || []).includes(sk)) &&
     (!dataOnly   || DATA.has(p.family)) &&
     (!remoteOnly || p.remote) &&
     (!payOnly    || p.pay) &&
@@ -334,7 +371,10 @@ function render() {{
   $('rows').innerHTML = list.slice(0, 400).map(p => `
     <tr>
       <td>${{esc(p.company)}}</td>
-      <td class="title"><a href="${{esc(p.url)}}" target="_blank" rel="noopener">${{esc(p.title)}}</a></td>
+      <td class="title">
+        <a href="${{esc(p.url)}}" target="_blank" rel="noopener">${{esc(p.title)}}</a>
+        <div class="skills">${{(p.skills || []).slice(0, 8).map(s => esc(s)).join(' &middot; ')}}</div>
+      </td>
       <td><span class="tag">${{esc(p.family)}}</span></td>
       <td>${{esc(p.seniority)}}</td>
       <td>${{p.remote ? '&#127758; ' : ''}}${{esc(p.location)}}</td>
@@ -349,7 +389,7 @@ function render() {{
   }}
 }}
 
-['q','family','seniority'].forEach(id =>
+['q','family','seniority','skill'].forEach(id =>
   $(id).addEventListener('input', render));
 
 ['dataOnly','remoteOnly','payOnly'].forEach(id =>

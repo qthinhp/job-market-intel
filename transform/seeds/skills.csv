@@ -1,0 +1,100 @@
+skill,category,pattern,confidence
+Python,language,"\bpython\b",high
+SQL,language,"\bsql\b",high
+R,language,"(^|[ ,/(])r([ ,/).]|$)",medium
+Scala,language,"\bscala\b",high
+Java,language,"\bjava\b",high
+JavaScript,language,"\bjavascript\b|\bjs\b",high
+TypeScript,language,"\btypescript\b",high
+Golang,language,"\bgolang\b|\bgo\s+(programming|language|developer)",high
+C++,language,"c\+\+",high
+C#,language,"c#|\.net\b",high
+Rust,language,"\brust\b",high
+Ruby,language,"\bruby\b",high
+Bash,language,"\bbash\b|\bshell script",high
+SAS,language,"\bsas\b",medium
+MATLAB,language,"\bmatlab\b",high
+VBA,language,"\bvba\b",high
+DAX,language,"\bdax\b",high
+M/Power Query,language,"power query",high
+PostgreSQL,database,"\bpostgres(ql)?\b",high
+MySQL,database,"\bmysql\b",high
+SQL Server,database,"sql server|\bt-sql\b|\bmssql\b|\bssms\b",high
+Oracle,database,"\boracle\b",medium
+MongoDB,database,"\bmongo(db)?\b",high
+Redis,database,"\bredis\b",high
+Cassandra,database,"\bcassandra\b",high
+Elasticsearch,database,"\belasticsearch\b|\bopensearch\b",high
+DuckDB,database,"\bduckdb\b",high
+Snowflake,warehouse,"\bsnowflake\b",high
+BigQuery,warehouse,"\bbigquery\b|\bbig query\b",high
+Redshift,warehouse,"\bredshift\b",high
+Databricks,warehouse,"\bdatabricks\b",high
+Synapse,warehouse,"azure synapse|\bsynapse\b",high
+Teradata,warehouse,"\bteradata\b",high
+ClickHouse,warehouse,"\bclickhouse\b",high
+Delta Lake,warehouse,"delta lake|\bdeltalake\b",high
+Iceberg,warehouse,"apache iceberg|\biceberg\b",high
+dbt,transformation,"\bdbt\b|data build tool",high
+Spark,transformation,"\bspark\b|\bpyspark\b",high
+Pandas,transformation,"\bpandas\b",high
+Polars,transformation,"\bpolars\b",high
+NumPy,transformation,"\bnumpy\b",high
+Airflow,orchestration,"\bairflow\b",high
+Dagster,orchestration,"\bdagster\b",high
+Prefect,orchestration,"\bprefect\b",high
+Luigi,orchestration,"\bluigi\b",medium
+Fivetran,ingestion,"\bfivetran\b",high
+Airbyte,ingestion,"\bairbyte\b",high
+Stitch,ingestion,"\bstitch data\b",high
+Segment,ingestion,"segment\.io|twilio segment",high
+Kafka,streaming,"\bkafka\b",high
+Kinesis,streaming,"\bkinesis\b",high
+Flink,streaming,"\bflink\b",high
+Pub/Sub,streaming,"pub/sub|\bpubsub\b",high
+Tableau,bi,"\btableau\b",high
+Power BI,bi,"power bi|\bpowerbi\b|\bssrs\b|\bssas\b",high
+Looker,bi,"\blooker\b|\blookml\b",high
+Mode,bi,"\bmode analytics\b",high
+Sigma,bi,"\bsigma computing\b",high
+Metabase,bi,"\bmetabase\b",high
+Superset,bi,"apache superset|\bsuperset\b",high
+Hex,bi,"hex\.tech",high
+Excel,bi,"microsoft excel|\bms excel\b|advanced excel|excel spreadsheet|excel model|excel skills|\bexcel,|\bexcel\.|\bexcel and\b",high
+Google Sheets,bi,"google sheets",high
+AWS,cloud,"\baws\b|amazon web services",high
+Azure,cloud,"\bazure\b",high
+GCP,cloud,"\bgcp\b|google cloud",high
+Terraform,infrastructure,"\bterraform\b",high
+Docker,infrastructure,"\bdocker\b",high
+Kubernetes,infrastructure,"\bkubernetes\b|\bk8s\b",high
+Git,infrastructure,"\bgit\b|\bgithub\b|\bgitlab\b",high
+CI/CD,infrastructure,"\bci/cd\b|continuous integration|continuous deployment",high
+Linux,infrastructure,"\blinux\b|\bunix\b",high
+Data quality,practice,"data quality|data validation|data testing",high
+Data modeling,practice,"data model(ing|ling)?\b|dimensional model|star schema|\bkimball\b",high
+ETL/ELT,practice,"\betl\b|\belt\b|data pipeline",high
+Data warehousing,practice,"data warehous(e|ing)",high
+Data governance,practice,"data governance|data lineage|data catalog",high
+Experimentation,practice,"a/b test|ab testing|experimentation|hypothesis test",high
+Statistics,practice,"\bstatistics\b|statistical analysis|\bregression\b",high
+Machine learning,ml,"machine learning|\bml\b",high
+Deep learning,ml,"deep learning|neural network",high
+PyTorch,ml,"\bpytorch\b",high
+TensorFlow,ml,"\btensorflow\b",high
+scikit-learn,ml,"scikit-learn|\bsklearn\b",high
+XGBoost,ml,"\bxgboost\b|\blightgbm\b",high
+LLM,ml,"\bllm\b|large language model|\bgenai\b|generative ai",high
+RAG,ml,"\brag\b|retrieval augmented",high
+MLOps,ml,"\bmlops\b|model deployment|feature store",high
+NLP,ml,"\bnlp\b|natural language processing",high
+Computer vision,ml,"computer vision",high
+Snowplow,analytics,"\bsnowplow\b",high
+Amplitude,analytics,"\bamplitude\b",high
+Mixpanel,analytics,"\bmixpanel\b",high
+Google Analytics,analytics,"google analytics|\bga4\b",high
+Salesforce,business,"\bsalesforce\b",high
+Jira,business,"\bjira\b|\bconfluence\b",high
+Agile,business,"\bagile\b|\bscrum\b",high
+Stakeholder management,business,"stakeholder",high
+Financial modeling,business,"financial model|\bforecasting\b",high

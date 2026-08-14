@@ -1,0 +1,33 @@
+version: 2
+
+seeds:
+  - name: skills
+    description: >
+      Curated taxonomy of tools, technologies, and practices, each with a
+      regex used to detect it in job description text.
+
+      Patterns are hand-written rather than generated because the hard cases
+      need judgment: `R` the language has to be told apart from "R&D", and
+      "excel at communication" must not count as Excel. `confidence` records
+      how much a given pattern can be trusted.
+    columns:
+      - name: skill
+        description: Canonical display name. Primary key.
+        tests:
+          - unique
+          - not_null
+      - name: category
+        tests:
+          - not_null
+      - name: pattern
+        description: Case-insensitive regex, matched against lowercased description text.
+        tests:
+          - not_null
+      - name: confidence
+        description: >
+          high — the pattern is distinctive and false positives are unlikely.
+          medium — short or overloaded token; some noise expected.
+          low — kept for coverage, but do not quote the number without checking.
+        tests:
+          - accepted_values:
+              values: [high, medium, low]

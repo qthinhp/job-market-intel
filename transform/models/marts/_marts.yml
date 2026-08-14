@@ -70,3 +70,26 @@ models:
         description: Fractional weight so a role posted in N cities still counts as one role.
         tests:
           - not_null
+
+  - name: fct_posting_skill
+    description: >
+      Many-to-many bridge between postings and the skill taxonomy. Grain is one
+      row per posting per skill per snapshot, asserted by
+      tests/assert_skill_grain_is_unique.sql.
+    columns:
+      - name: posting_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_posting')
+              field: posting_key
+      - name: skill
+        tests:
+          - not_null
+          - relationships:
+              to: ref('skills')
+              field: skill
+      - name: match_confidence
+        tests:
+          - accepted_values:
+              values: [high, medium, low]
